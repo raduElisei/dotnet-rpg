@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using dotnet_rpg.Services.CharacterService;
 
 namespace dotnet_rpg.Controllers
 {
@@ -8,12 +9,32 @@ namespace dotnet_rpg.Controllers
     [Route("api/[controller]")]
     public class CharacterController : ControllerBase
     {
-        private static Character knight = new();
+        private readonly ICharacterService _characterService;
 
-        [HttpGet]
-        public ActionResult<Character> Get()
+        public CharacterController(ICharacterService characterService)
         {
-            return Ok(knight);
+            _characterService = characterService;
+        }
+
+        [HttpGet("GetAll")]
+        // poate fi scris si separat:
+        // [HttpGet]
+        // [Route("GetAll")]
+        public async Task<ActionResult<ServiceResponse<List<Character>>>> Get()
+        {
+            return Ok(await _characterService.GetAllCharacters());
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<ServiceResponse<Character>>> GetSingle(int id)
+        {
+            return Ok(await _characterService.GetCharacterById(id));
+        }
+
+        [HttpPost]
+        public async Task<ActionResult<ServiceResponse<List<Character>>>> AddCharacter(Character newCharacter)
+        {
+            return Ok(await _characterService.AddCharacter(newCharacter));
         }
     }
 }
