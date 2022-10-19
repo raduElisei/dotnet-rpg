@@ -2,13 +2,12 @@ using System.Security.Claims;
 using AutoMapper;
 using dotnet_rpg.Data;
 using dotnet_rpg.Dtos.Character;
-using dotnet_rpg.Models;
 using Microsoft.EntityFrameworkCore;
+
+#nullable disable
 
 namespace dotnet_rpg.Services.CharacterService
 {
-#nullable disable
-
     public class CharacterService : ICharacterService
     {
         private readonly IMapper _mapper;
@@ -28,7 +27,7 @@ namespace dotnet_rpg.Services.CharacterService
 
         private int GetUserId() =>
             int.Parse(
-                _httpContextAccessor.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value
+                _httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
             );
 
         public async Task<ServiceResponse<List<GetCharacterDto>>> AddCharacter(
@@ -37,9 +36,11 @@ namespace dotnet_rpg.Services.CharacterService
         {
             var serviceResponse = new ServiceResponse<List<GetCharacterDto>>();
             Character character = _mapper.Map<Character>(newCharacter);
+            character.User = await _context.Users.FirstOrDefaultAsync(u => u.Id == GetUserId());
             _context.Characters.Add(character);
             await _context.SaveChangesAsync();
             serviceResponse.Data = await _context.Characters
+                .Where(c => c.User.Id == GetUserId())
                 .Select(c => _mapper.Map<GetCharacterDto>(c))
                 .ToListAsync();
             return serviceResponse;
@@ -52,12 +53,23 @@ namespace dotnet_rpg.Services.CharacterService
 
             try
             {
-                Character character = await _context.Characters.FirstAsync(c => c.Id == id);
-                _context.Characters.Remove(character);
-                await _context.SaveChangesAsync();
-                serviceResponse.Data = _context.Characters
-                    .Select(c => _mapper.Map<GetCharacterDto>(c))
-                    .ToList();
+                Character character = await _context.Characters.FirstOrDefaultAsync(
+                    c => c.Id == id && c.User.Id == GetUserId()
+                );
+                if (character != null)
+                {
+                    _context.Characters.Remove(character);
+                    await _context.SaveChangesAsync();
+                    serviceResponse.Data = _context.Characters
+                        .Where(c => c.User.Id == GetUserId())
+                        .Select(c => _mapper.Map<GetCharacterDto>(c))
+                        .ToList();
+                }
+                else
+                {
+                    serviceResponse.Success = false;
+                    serviceResponse.Message = "Could not find character.";
+                }
             }
             catch (Exception ex)
             {
@@ -70,20 +82,20 @@ namespace dotnet_rpg.Services.CharacterService
 
         public async Task<ServiceResponse<List<GetCharacterDto>>> GetAllCharacters()
         {
-            var serviceResponse = new ServiceResponse<List<GetCharacterDto>>();
+            var response = new ServiceResponse<List<GetCharacterDto>>();
             var dbCharacters = await _context.Characters
                 .Where(c => c.User.Id == GetUserId())
                 .ToListAsync();
-            serviceResponse.Data = dbCharacters
-                .Select(c => _mapper.Map<GetCharacterDto>(c))
-                .ToList();
-            return serviceResponse;
+            response.Data = dbCharacters.Select(c => _mapper.Map<GetCharacterDto>(c)).ToList();
+            return response;
         }
 
         public async Task<ServiceResponse<GetCharacterDto>> GetCharacterById(int id)
         {
             var serviceResponse = new ServiceResponse<GetCharacterDto>();
-            var dbCharacter = await _context.Characters.FirstOrDefaultAsync(c => c.Id == id);
+            var dbCharacter = await _context.Characters.FirstOrDefaultAsync(
+                c => c.Id == id && c.User.Id == GetUserId()
+            );
             serviceResponse.Data = _mapper.Map<GetCharacterDto>(dbCharacter);
             return serviceResponse;
         }
@@ -97,36 +109,43 @@ namespace dotnet_rpg.Services.CharacterService
 
             try
             {
-                Character character = await _context.Characters.FirstOrDefaultAsync(
-                    c => c.Id == updatedCharacter.Id
-                );
+                Character character = await _context.Characters
+                    .Include(c => c.User)
+                    .FirstOrDefaultAsync(c => c.Id == updatedCharacter.Id);
+                if (character.User.Id == GetUserId())
+                {
+                    character.Name =
+                        updatedCharacter.Name == null ? character.Name : updatedCharacter.Name;
+                    character.HitPoints =
+                        updatedCharacter.HitPoints.ToString() == "0"
+                            ? character.HitPoints
+                            : updatedCharacter.HitPoints;
+                    character.Strength =
+                        updatedCharacter.Strength.ToString() == "0"
+                            ? character.Strength
+                            : updatedCharacter.Strength;
+                    character.Defense =
+                        updatedCharacter.Defense.ToString() == "0"
+                            ? character.Defense
+                            : updatedCharacter.Defense;
+                    character.Intelligence =
+                        updatedCharacter.Intelligence.ToString() == "0"
+                            ? character.Intelligence
+                            : updatedCharacter.Intelligence;
+                    character.Class =
+                        updatedCharacter.Class.ToString() == "0"
+                            ? character.Class
+                            : updatedCharacter.Class;
 
-                character.Name =
-                    updatedCharacter.Name == null ? character.Name : updatedCharacter.Name;
-                character.HitPoints =
-                    updatedCharacter.HitPoints.ToString() == "0"
-                        ? character.HitPoints
-                        : updatedCharacter.HitPoints;
-                character.Strength =
-                    updatedCharacter.Strength.ToString() == "0"
-                        ? character.Strength
-                        : updatedCharacter.Strength;
-                character.Defense =
-                    updatedCharacter.Defense.ToString() == "0"
-                        ? character.Defense
-                        : updatedCharacter.Defense;
-                character.Intelligence =
-                    updatedCharacter.Intelligence.ToString() == "0"
-                        ? character.Intelligence
-                        : updatedCharacter.Intelligence;
-                character.Class =
-                    updatedCharacter.Class.ToString() == "0"
-                        ? character.Class
-                        : updatedCharacter.Class;
+                    await _context.SaveChangesAsync();
 
-                await _context.SaveChangesAsync();
-
-                serviceResponse.Data = _mapper.Map<GetCharacterDto>(character);
+                    serviceResponse.Data = _mapper.Map<GetCharacterDto>(character);
+                }
+                else
+                {
+                    serviceResponse.Success = false;
+                    serviceResponse.Message = "Character not found";
+                }
             }
             catch (Exception ex)
             {

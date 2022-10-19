@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using dotnet_rpg.Services.CharacterService;
 using dotnet_rpg.Dtos.Character;
+using Microsoft.AspNetCore.Authorization;
 
 namespace dotnet_rpg.Controllers
 {
+    [Authorize]
     [ApiController]
     // api/[controller] se traduce in acest context ca api/Character dupa numele clasei de tip controller
     // e sinonim cu [Route("[controller]")]
