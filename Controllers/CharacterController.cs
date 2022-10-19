@@ -1,9 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using dotnet_rpg.Services.CharacterService;
 using dotnet_rpg.Dtos.Character;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace dotnet_rpg.Controllers
 {
+    [Authorize]
     [ApiController]
     // api/[controller] se traduce in acest context ca api/Character dupa numele clasei de tip controller
     // e sinonim cu [Route("[controller]")]
@@ -23,7 +26,10 @@ namespace dotnet_rpg.Controllers
         // [Route("GetAll")]
         public async Task<ActionResult<ServiceResponse<List<GetCharacterDto>>>> Get()
         {
-            return Ok(await _characterService.GetAllCharacters());
+            int userId = int.Parse(
+                User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier).Value
+            );
+            return Ok(await _characterService.GetAllCharacters(userId));
         }
 
         [HttpGet("{id}")]
@@ -33,16 +39,20 @@ namespace dotnet_rpg.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<ServiceResponse<List<Character>>>> AddCharacter(AddCharacterDto newCharacter)
+        public async Task<ActionResult<ServiceResponse<List<Character>>>> AddCharacter(
+            AddCharacterDto newCharacter
+        )
         {
             return Ok(await _characterService.AddCharacter(newCharacter));
         }
 
         [HttpPut]
-        public async Task<ActionResult<ServiceResponse<GetCharacterDto>>> UpdateCharacter(UpdateCharacterDto updatedCharacter)
+        public async Task<ActionResult<ServiceResponse<GetCharacterDto>>> UpdateCharacter(
+            UpdateCharacterDto updatedCharacter
+        )
         {
             var serviceResponse = await _characterService.UpdateCharacter(updatedCharacter);
-            if(serviceResponse.Data == null)
+            if (serviceResponse.Data == null)
             {
                 return NotFound(serviceResponse);
             }
@@ -53,7 +63,7 @@ namespace dotnet_rpg.Controllers
         public async Task<ActionResult<ServiceResponse<List<GetCharacterDto>>>> Delete(int id)
         {
             var serviceResponse = await _characterService.DeleteCharacter(id);
-            if(serviceResponse.Data == null)
+            if (serviceResponse.Data == null)
             {
                 return NotFound(serviceResponse);
             }
