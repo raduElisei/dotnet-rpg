@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using dotnet_rpg.Services.CharacterService;
 using dotnet_rpg.Dtos.Character;
 using Microsoft.AspNetCore.Authorization;
+using dotnet_rpg.Dtos;
 
 namespace dotnet_rpg.Controllers
 {
@@ -64,6 +65,12 @@ namespace dotnet_rpg.Controllers
                 return NotFound(serviceResponse);
             }
             return Ok(serviceResponse);
+        }
+
+        [HttpPost("Skill")]
+        public async Task<ActionResult<ServiceResponse<GetCharacterDto>>> AddCharacterSkill(AddCharacterSkillDto newCharacterSkill)
+        {
+            return Ok(await _characterService.AddCharacterSkill(newCharacterSkill));
         }
     }
 }
